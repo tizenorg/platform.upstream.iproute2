@@ -5,6 +5,8 @@ HOSTCC ?= $(CC)
 CCOPTS  = $(CBUILD_CFLAGS)
 LDLIBS += -lm 
 
+LIBDIR = /usr/lib
+
 all: $(DISTGEN) $(DISTDATA)
 
 $(DISTGEN):
@@ -20,9 +22,9 @@ stats: stats.c
 	$(HOSTCC) $(CCOPTS) -I../include -o $@ $@.c -lm
 
 install: all
-	mkdir -p $(DESTDIR)$(LIBDIR)/tc
+	mkdir -p $(DESTDIR)/usr/share/tc
 	for i in $(DISTDATA); \
-	do install -m 644 $$i $(DESTDIR)$(LIBDIR)/tc; \
+	do install -m 644 $$i $(DESTDIR)/usr/share/tc; \
 	done
 
 clean:

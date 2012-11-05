@@ -1,10 +1,10 @@
 ROOTDIR=$(DESTDIR)
 PREFIX=/usr
 LIBDIR=$(PREFIX)/lib
-SBINDIR=/sbin
+SBINDIR=/usr/sbin
 CONFDIR=/etc/iproute2
 DATADIR=$(PREFIX)/share
-DOCDIR=$(DATADIR)/doc/iproute2
+DOCDIR=$(DATADIR)/doc/packages/iproute2
 MANDIR=$(DATADIR)/man
 ARPDDIR=/var/lib/arpd
 
@@ -35,7 +35,7 @@ HOSTCC = gcc
 DEFINES += -D_GNU_SOURCE
 CCOPTS = -O2
 WFLAGS = -Wall -Wstrict-prototypes
-CFLAGS = $(WFLAGS) $(CCOPTS) -I../include $(DEFINES)
+CFLAGS = -DLIBDIR=\"${LIBDIR}\" $(WFLAGS) $(CCOPTS) -I../include $(DEFINES)
 YACCFLAGS = -d -t -v
 
 SUBDIRS=lib ip tc misc netem genl man
