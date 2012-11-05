@@ -10,8 +10,6 @@ Group:          Productivity/Networking/Routing
 #DL-URL:	http://kernel.org/pub/linux/utils/net/iproute2/
 #Git-Clone:	git://git.kernel.org/pub/scm/linux/kernel/git/shemminger/iproute2
 Source:         %{name}-%{version}.tar.xz
-Source2:        %{name}-%{version}.tar.sign
-Patch1:         iproute2-HZ.diff
 BuildRequires:  bison
 BuildRequires:  db4-devel
 BuildRequires:  flex
