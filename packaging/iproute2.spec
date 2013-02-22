@@ -13,13 +13,13 @@ Source:         %{name}-%{version}.tar.xz
 BuildRequires:  bison
 BuildRequires:  db4-devel
 BuildRequires:  flex
-BuildRequires:  libpng-devel
-BuildRequires:  libtiff-devel
+BuildRequires:  libnl-devel
 BuildRequires:  pkgconfig >= 0.21
 BuildRequires:  xz
-BuildRequires:  libnl-devel
-BuildRequires:  libxtables-devel
-Provides:       iproute = %{version}-%{release}
+BuildRequires:  pkgconfig(libpng12)
+BuildRequires:  pkgconfig(libtiff-4)
+BuildRequires:  pkgconfig(xtables)
+Provides:       iproute = %{version}
 
 %description
 This package provides the tools ip, tc, and rtmon needed to use the new
@@ -31,7 +31,7 @@ distribution has used this package for network setup since SuSE Linux
 License:        GPL-2.0+
 Summary:        A Higher Level Interface to the Netlink Service
 Group:          Development/Libraries/C and C++
-Provides:       libnetlink = %{version}-%{release}
+Provides:       libnetlink = %{version}
 
 %description -n libnetlink-devel
 libnetlink provides a higher level interface to rtnetlink(7).
@@ -62,7 +62,7 @@ rm %{buildroot}%{_sbindir}/ifcfg
 
 %files
 %defattr(-,root,root)
-%doc COPYING
+%license COPYING
 %{_sbindir}/*
 %dir %{_sysconfdir}/iproute2
 %config(noreplace) %{_sysconfdir}/iproute2/*
