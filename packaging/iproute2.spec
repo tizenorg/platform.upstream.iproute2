@@ -59,6 +59,8 @@ chmod -x %{buildroot}/%{_libdir}/libnetlink.a
 install include/libnetlink.h %{buildroot}%{_includedir}
 chmod -x %{buildroot}%{_includedir}/libnetlink.h
 rm %{buildroot}%{_sbindir}/ifcfg
+%remove_docs
+
 
 %files
 %defattr(-,root,root)
