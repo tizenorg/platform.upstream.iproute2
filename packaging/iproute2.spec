@@ -10,6 +10,7 @@ Group:          Productivity/Networking/Routing
 #DL-URL:	http://kernel.org/pub/linux/utils/net/iproute2/
 #Git-Clone:	git://git.kernel.org/pub/scm/linux/kernel/git/shemminger/iproute2
 Source:         %{name}-%{version}.tar.xz
+Source1001: 	iproute2.manifest
 BuildRequires:  bison
 BuildRequires:  db4-devel
 BuildRequires:  flex
@@ -38,6 +39,7 @@ libnetlink provides a higher level interface to rtnetlink(7).
 
 %prep
 %setup -q
+cp %{SOURCE1001} .
 find . -name *.orig -delete
 
 %build
@@ -63,6 +65,7 @@ rm %{buildroot}%{_sbindir}/ifcfg
 
 
 %files
+%manifest %{name}.manifest
 %defattr(-,root,root)
 %license COPYING
 %{_sbindir}/*
@@ -74,6 +77,7 @@ rm %{buildroot}%{_sbindir}/ifcfg
 
 
 %files -n libnetlink-devel
+%manifest %{name}.manifest
 %defattr(-,root,root)
 %{_includedir}/*
 %{_libdir}/lib*
