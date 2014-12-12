@@ -17,7 +17,7 @@ BuildRequires:  flex
 BuildRequires:  libnl-devel
 BuildRequires:  pkgconfig >= 0.21
 BuildRequires:  xz
-BuildRequires:  pkgconfig(libpng12)
+BuildRequires:  pkgconfig(libpng16)
 BuildRequires:  pkgconfig(libtiff-4)
 BuildRequires:  pkgconfig(xtables)
 Provides:       iproute = %{version}
