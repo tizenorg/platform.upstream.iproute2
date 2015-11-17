@@ -1,6 +1,6 @@
 Name: iproute2
 Summary: collection of utilities for controlling TCP/IP networking and traffic control in Linux
-Version: 3.4.0
+Version: 3.9.0
 Release: 1
 Source: %{name}-%{version}.tar.gz
 Patch1: act_ipt_fix_xtables.patch
