@@ -128,7 +128,7 @@ static int parse_args(int argc, char **argv, struct ifreq *ifr, uid_t *uid, gid_
 				}
 				ifr->ifr_flags |= IFF_TAP;
 			} else {
-				fprintf(stderr,"Cannot guess tunnel mode.\n");
+				fprintf(stderr,"Unknown tunnel mode \"%s\"\n", *argv);
 				exit(-1);
 			}
 		} else if (uid && matches(*argv, "user") == 0) {
@@ -307,7 +307,7 @@ int do_iptuntap(int argc, char **argv)
 	if (argc > 0) {
 		if (matches(*argv, "add") == 0)
 			return do_add(argc-1, argv+1);
-		if (matches(*argv, "del") == 0)
+		if (matches(*argv, "delete") == 0)
 			return do_del(argc-1, argv+1);
 		if (matches(*argv, "show") == 0 ||
                     matches(*argv, "lst") == 0 ||

@@ -1,85 +1,140 @@
-Name:           iproute2
-Version:        3.4.0
-Release:        0
-License:        GPL-2.0
-Summary:        Linux network configuration utilities
-Url:            http://www.linuxfoundation.org/collaborate/workgroups/networking/iproute2
-Group:          Productivity/Networking/Routing
-# Using GPL-2.0 instead of GPL-2.0+ because of tc_skbedit.h and tc/q_multiq.c
-
-#DL-URL:	http://kernel.org/pub/linux/utils/net/iproute2/
-#Git-Clone:	git://git.kernel.org/pub/scm/linux/kernel/git/shemminger/iproute2
-Source:         %{name}-%{version}.tar.xz
-Source1001: 	iproute2.manifest
-BuildRequires:  bison
-BuildRequires:  db4-devel
-BuildRequires:  flex
-BuildRequires:  libnl-devel
-BuildRequires:  pkgconfig >= 0.21
-BuildRequires:  xz
-BuildRequires:  pkgconfig(libpng)
-BuildRequires:  pkgconfig(libtiff-4)
-BuildRequires:  pkgconfig(xtables)
-Provides:       iproute = %{version}
+Name: iproute2
+Summary: collection of utilities for controlling TCP/IP networking and traffic control in Linux
+Version: 3.4.0
+Release: 1
+Source: %{name}-%{version}.tar.gz
+Patch1: act_ipt_fix_xtables.patch
+Patch2: gcc4_8_build_fix.patch
+Group: System/Base
+URL: https://www.kernel.org/pub/linux/utils/net/iproute2/
+License: GPL-2.0+
+BuildRequires: kernel-headers
+BuildRequires: bison
+BuildRequires: flex
+BuildRequires: db4-devel
+BuildRequires: pkgconfig(xtables)
+Conflicts: kernel < 2.4.20
 
 %description
-This package provides the tools ip, tc, and rtmon needed to use the new
-and advanced routing options of the Linux kernel. The SUSE Linux
-distribution has used this package for network setup since SuSE Linux
-8.0.
+The iproute package contains networking utilities (ip, rtmon, tc etc)
+which are designed to use the advanced networking capabilities of the Linux
+2.4.x and 2.6.x kernel. Ip controls IPv4 and IPv6 configuration, tc stands
+for traffic control. Both prints detailed usage. rtmon monitors the routing.
+table changes.
 
-%package -n libnetlink-devel
-License:        GPL-2.0+
-Summary:        A Higher Level Interface to the Netlink Service
-Group:          Development/Libraries/C and C++
-Provides:       libnetlink = %{version}
+%package devel
+Summary: development files for iproutes libnetlink
+Group: System/Base
+License: GPL-2.0+
+Requires: %{name} = %{version}-%{release}
 
-%description -n libnetlink-devel
-libnetlink provides a higher level interface to rtnetlink(7).
+%description devel
+Header files, library and documentation for libnetlink.
+A library for accessing the netlink service.
 
 %prep
 %setup -q
-cp %{SOURCE1001} .
-find . -name *.orig -delete
+%patch1 -p1
+%patch2 -p1
 
 %build
-# build with -fPIC. For details see
-# https://bugzilla.novell.com/show_bug.cgi?id=388021
 ./configure
-xtlibdir="$(pkg-config xtables --variable=xtlibdir)";
-make %{?_smp_mflags} LIBDIR=%{_libdir} CCOPTS="-D_GNU_SOURCE %{optflags} -Wstrict-prototypes -fPIC -DXT_LIB_DIR=\\\"$xtlibdir\\\""
+make %{?jobs:-j%jobs}
 
 %install
-install -d %{buildroot}/{etc/,sbin/,usr/{sbin,share/man/man{3,8}}}
-install -d %{buildroot}/{/usr/include,%{_libdir},/usr/share}
-make install DESTDIR=%{buildroot} LIBDIR=%{_libdir} \
-	MODDESTDIR="%{buildroot}/%{_libdir}/tc"
-# We have m_xt
-rm -f "%{buildroot}/%{_libdir}/tc/m_ipt.so"
-install lib/libnetlink.a %{buildroot}/%{_libdir}
-chmod -x %{buildroot}/%{_libdir}/libnetlink.a
-install include/libnetlink.h %{buildroot}%{_includedir}
-chmod -x %{buildroot}%{_includedir}/libnetlink.h
-rm %{buildroot}%{_sbindir}/ifcfg
-%remove_docs
+mkdir -p \
+    %{buildroot}%{_includedir} \
+    %{buildroot}%{_sbindir} \
+    %{buildroot}%{_mandir}/man3 \
+    %{buildroot}%{_mandir}/man7 \
+    %{buildroot}%{_mandir}/man8 \
+    %{buildroot}%{_datadir}/tc \
+    %{buildroot}%{_libdir}/tc \
+    %{buildroot}/usr%{_sysconfdir}/iproute2 \
+    %{buildroot}%{_datadir}/license
 
+for binary in \
+    bridge/bridge \
+    genl/genl \
+    ip/ifcfg \
+    ip/ip \
+    ip/routef \
+    ip/routel \
+    ip/rtmon \
+    ip/rtpr \
+    misc/arpd \
+    misc/ifstat \
+    misc/lnstat \
+    misc/nstat \
+    misc/rtacct \
+    misc/ss \
+    tc/tc
+    do install -m755 ${binary} %{buildroot}%{_sbindir}
+done
+
+cd %{buildroot}%{_sbindir}
+    ln -s lnstat ctstat
+    ln -s lnstat rtstat
+cd -
+
+# Libs
+install -m755 tc/m_xt.so %{buildroot}%{_libdir}/tc
+cd %{buildroot}%{_libdir}/tc
+    ln -s m_xt.so m_ipt.so
+cd -
+
+# libnetlink
+install -m644 include/libnetlink.h %{buildroot}%{_includedir}
+install -m644 lib/libnetlink.a %{buildroot}%{_libdir}
+
+# Manpages
+iconv -f latin1 -t utf8 man/man8/ss.8 > man/man8/ss.8.utf8 &&
+    mv man/man8/ss.8.utf8 man/man8/ss.8
+install -m644 man/man3/*.3 %{buildroot}%{_mandir}/man3
+install -m644 man/man7/*.7 %{buildroot}%{_mandir}/man7
+install -m644 man/man8/*.8 %{buildroot}%{_mandir}/man8
+
+# Share files
+for shared in \
+    netem/normal.dist \
+    netem/pareto.dist \
+    netem/paretonormal.dist
+    do install -m644 ${shared} %{buildroot}%{_datadir}/tc
+done
+
+# Config files
+install -m644 etc/iproute2/* %{buildroot}/usr%{_sysconfdir}/iproute2
+
+cp COPYING %{buildroot}%{_datadir}/license/iproute2
+cp COPYING %{buildroot}%{_datadir}/license/iproute2-devel
+
+%clean
+rm -rf $RPM_BUILD_ROOT
+
+%post
+/sbin/ldconfig
+
+%postun -p /sbin/ldconfig
 
 %files
-%manifest %{name}.manifest
+%manifest iproute2.manifest
+%dir /usr%{_sysconfdir}/iproute2
+%attr(644,root,root) %config(noreplace) /usr%{_sysconfdir}/iproute2/*
 %defattr(-,root,root)
-%license COPYING
 %{_sbindir}/*
-%dir %{_sysconfdir}/iproute2
-%config(noreplace) %{_sysconfdir}/iproute2/*
-%{_libdir}/tc
 %dir %{_datadir}/tc
-%attr(644,root,root)%{_datadir}/tc/*
+%{_datadir}/tc/*
+%dir %{_libdir}/tc/
+%{_libdir}/tc/*
+%dir %{_datadir}/license/
+%{_datadir}/license/iproute2
 
-
-%files -n libnetlink-devel
-%manifest %{name}.manifest
+%files devel
 %defattr(-,root,root)
-%{_includedir}/*
-%{_libdir}/lib*
-
-%docs_package
+%doc README README.decnet README.iproute2+tc README.distribution README.lnstat
+%{_mandir}/man7/*
+%{_mandir}/man8/*
+%{_mandir}/man3/*
+%{_libdir}/libnetlink.a
+%{_includedir}/libnetlink.h
+%{_datadir}/license/iproute2-devel

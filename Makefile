@@ -1,10 +1,10 @@
 ROOTDIR=$(DESTDIR)
 PREFIX=/usr
 LIBDIR=$(PREFIX)/lib
-SBINDIR=/usr/sbin
+SBINDIR=/sbin
 CONFDIR=/etc/iproute2
 DATADIR=$(PREFIX)/share
-DOCDIR=$(DATADIR)/doc/packages/iproute2
+DOCDIR=$(DATADIR)/doc/iproute2
 MANDIR=$(DATADIR)/man
 ARPDDIR=/var/lib/arpd
 
@@ -20,10 +20,6 @@ endif
 
 DEFINES+=-DCONFDIR=\"$(CONFDIR)\"
 
-#options if you have a bind>=4.9.4 libresolv (or, maybe, glibc)
-LDLIBS=-lresolv
-ADDLIB=
-
 #options for decnet
 ADDLIB+=dnet_ntop.o dnet_pton.o
 
@@ -34,11 +30,16 @@ CC = gcc
 HOSTCC = gcc
 DEFINES += -D_GNU_SOURCE
 CCOPTS = -O2
-WFLAGS = -Wall -Wstrict-prototypes
-CFLAGS = -DLIBDIR=\"${LIBDIR}\" $(WFLAGS) $(CCOPTS) -I../include $(DEFINES)
+WFLAGS := -g -Wall -Wstrict-prototypes -Werror -Wmissing-prototypes
+WFLAGS += -Wmissing-declarations -Wold-style-definition
+
+CFLAGS = $(WFLAGS) $(CCOPTS) -I../include $(DEFINES)
 YACCFLAGS = -d -t -v
 
-SUBDIRS=lib ip tc misc netem genl man
+CFLAGS += -fPIE
+LDFLAGS += -pie
+
+SUBDIRS=lib ip tc bridge misc netem genl man
 
 LIBNETLINK=../lib/libnetlink.a ../lib/libutil.a
 LDLIBS += $(LIBNETLINK)

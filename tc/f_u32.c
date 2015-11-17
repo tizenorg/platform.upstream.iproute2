@@ -45,7 +45,7 @@ static void explain(void)
 	fprintf(stderr, "\nNOTE: CLASSID is parsed at hexadecimal input.\n");
 }
 
-int get_u32_handle(__u32 *handle, const char *str)
+static int get_u32_handle(__u32 *handle, const char *str)
 {
 	__u32 htid=0, hash=0, nodeid=0;
 	char *tmp = strchr(str, ':');
@@ -80,7 +80,7 @@ int get_u32_handle(__u32 *handle, const char *str)
 	return 0;
 }
 
-char * sprint_u32_handle(__u32 handle, char *buf)
+static char * sprint_u32_handle(__u32 handle, char *buf)
 {
 	int bsize = SPRINT_BSIZE-1;
 	__u32 htid = TC_U32_HTID(handle);
@@ -194,7 +194,7 @@ static int pack_key8(struct tc_u32_sel *sel, __u32 key, __u32 mask, int off, int
 }
 
 
-int parse_at(int *argc_p, char ***argv_p, int *off, int *offmask)
+static int parse_at(int *argc_p, char ***argv_p, int *off, int *offmask)
 {
 	int argc = *argc_p;
 	char **argv = *argv_p;
@@ -513,7 +513,7 @@ static int parse_ip(int *argc_p, char ***argv_p, struct tc_u32_sel *sel)
 		res = pack_key16(sel, 0, 0x3FFF, 6, 0);
 	} else if (strcmp(*argv, "firstfrag") == 0) {
 		argc--; argv++;
-		res = pack_key16(sel, 0, 0x1FFF, 6, 0);
+		res = pack_key16(sel, 0x2000, 0x3FFF, 6, 0);
 	} else if (strcmp(*argv, "df") == 0) {
 		argc--; argv++;
 		res = pack_key16(sel, 0x4000, 0x4000, 6, 0);
@@ -531,7 +531,7 @@ static int parse_ip(int *argc_p, char ***argv_p, struct tc_u32_sel *sel)
 		res = parse_u8(&argc, &argv, sel, 20, 0);
 	} else if (strcmp(*argv, "icmp_code") == 0) {
 		NEXT_ARG();
-		res = parse_u8(&argc, &argv, sel, 20, 1);
+		res = parse_u8(&argc, &argv, sel, 21, 0);
 	} else
 		return -1;
 

@@ -60,6 +60,7 @@ static void usage(void)
 	fprintf(stderr, "Usage: ip route { list | flush } SELECTOR\n");
 	fprintf(stderr, "       ip route save SELECTOR\n");
 	fprintf(stderr, "       ip route restore\n");
+	fprintf(stderr, "       ip route showdump\n");
 	fprintf(stderr, "       ip route get ADDRESS [ from ADDRESS iif STRING ]\n");
 	fprintf(stderr, "                            [ oif STRING ]  [ tos TOS ]\n");
 	fprintf(stderr, "                            [ mark NUMBER ]\n");
@@ -82,7 +83,6 @@ static void usage(void)
 	fprintf(stderr, "          unreachable | prohibit | blackhole | nat ]\n");
 	fprintf(stderr, "TABLE_ID := [ local | main | default | all | NUMBER ]\n");
 	fprintf(stderr, "SCOPE := [ host | link | global | NUMBER ]\n");
-	fprintf(stderr, "MP_ALGO := { rr | drr | random | wrandom }\n");
 	fprintf(stderr, "NHFLAGS := [ onlink | pervasive ]\n");
 	fprintf(stderr, "RTPROTO := [ kernel | boot | static | NUMBER ]\n");
 	fprintf(stderr, "TIME := NUMBER[s|ms]\n");
@@ -92,7 +92,7 @@ static void usage(void)
 
 static struct
 {
-	int tb;
+	unsigned int tb;
 	int cloned;
 	int flushed;
 	char *flushb;
@@ -124,7 +124,7 @@ static int flush_update(void)
 	return 0;
 }
 
-int filter_nlmsg(struct nlmsghdr *n, struct rtattr **tb, int host_len)
+static int filter_nlmsg(struct nlmsghdr *n, struct rtattr **tb, int host_len)
 {
 	struct rtmsg *r = NLMSG_DATA(n);
 	inet_prefix dst;
@@ -263,7 +263,7 @@ int filter_nlmsg(struct nlmsghdr *n, struct rtattr **tb, int host_len)
 	return 1;
 }
 
-int calc_host_len(struct rtmsg *r)
+static int calc_host_len(const struct rtmsg *r)
 {
 	if (r->rtm_family == AF_INET6)
 		return 128;
@@ -625,16 +625,22 @@ int print_route(const struct sockaddr_nl *who, struct nlmsghdr *n, void *arg)
 }
 
 
-int parse_one_nh(struct rtattr *rta, struct rtnexthop *rtnh, int *argcp, char ***argvp)
+static int parse_one_nh(struct rtmsg *r, struct rtattr *rta,
+			struct rtnexthop *rtnh,
+			int *argcp, char ***argvp)
 {
 	int argc = *argcp;
 	char **argv = *argvp;
 
 	while (++argv, --argc > 0) {
 		if (strcmp(*argv, "via") == 0) {
+			inet_prefix addr;
 			NEXT_ARG();
-			rta_addattr32(rta, 4096, RTA_GATEWAY, get_addr32(*argv));
-			rtnh->rtnh_len += sizeof(struct rtattr) + 4;
+			get_addr(&addr, *argv, r->rtm_family);
+			if (r->rtm_family == AF_UNSPEC)
+				r->rtm_family = addr.family;
+			rta_addattr_l(rta, 4096, RTA_GATEWAY, &addr.data, addr.bytelen);
+			rtnh->rtnh_len += sizeof(struct rtattr) + addr.bytelen;
 		} else if (strcmp(*argv, "dev") == 0) {
 			NEXT_ARG();
 			if ((rtnh->rtnh_ifindex = ll_name_to_index(*argv)) == 0) {
@@ -664,7 +670,8 @@ int parse_one_nh(struct rtattr *rta, struct rtnexthop *rtnh, int *argcp, char **
 	return 0;
 }
 
-int parse_nexthops(struct nlmsghdr *n, struct rtmsg *r, int argc, char **argv)
+static int parse_nexthops(struct nlmsghdr *n, struct rtmsg *r,
+			  int argc, char **argv)
 {
 	char buf[1024];
 	struct rtattr *rta = (void*)buf;
@@ -686,7 +693,7 @@ int parse_nexthops(struct nlmsghdr *n, struct rtmsg *r, int argc, char **argv)
 		memset(rtnh, 0, sizeof(*rtnh));
 		rtnh->rtnh_len = sizeof(*rtnh);
 		rta->rta_len += rtnh->rtnh_len;
-		parse_one_nh(rta, rtnh, &argc, &argv);
+		parse_one_nh(r, rta, rtnh, &argc, &argv);
 		rtnh = RTNH_NEXT(rtnh);
 	}
 
@@ -695,8 +702,7 @@ int parse_nexthops(struct nlmsghdr *n, struct rtmsg *r, int argc, char **argv)
 	return 0;
 }
 
-
-int iproute_modify(int cmd, unsigned flags, int argc, char **argv)
+static int iproute_modify(int cmd, unsigned flags, int argc, char **argv)
 {
 	struct {
 		struct nlmsghdr 	n;
@@ -964,8 +970,6 @@ int iproute_modify(int cmd, unsigned flags, int argc, char **argv)
 	if (d || nhs_ok)  {
 		int idx;
 
-		ll_init_map(&rth);
-
 		if (d) {
 			if ((idx = ll_name_to_index(d)) == 0) {
 				fprintf(stderr, "Cannot find device \"%s\"\n", d);
@@ -1064,18 +1068,16 @@ static int iproute_flush_cache(void)
 	return 0;
 }
 
-int save_route(const struct sockaddr_nl *who, struct nlmsghdr *n, void *arg)
+static __u32 route_dump_magic = 0x45311224;
+
+static int save_route(const struct sockaddr_nl *who, struct nlmsghdr *n,
+		      void *arg)
 {
 	int ret;
 	int len = n->nlmsg_len;
 	struct rtmsg *r = NLMSG_DATA(n);
 	struct rtattr *tb[RTA_MAX+1];
 	int host_len = -1;
-
-	if (isatty(STDOUT_FILENO)) {
-		fprintf(stderr, "Not sending binary stream to stdout\n");
-		return -1;
-	}
 
 	host_len = calc_host_len(r);
 	len -= NLMSG_LENGTH(sizeof(*r));
@@ -1093,6 +1095,24 @@ int save_route(const struct sockaddr_nl *who, struct nlmsghdr *n, void *arg)
 	return ret == n->nlmsg_len ? 0 : ret;
 }
 
+static int save_route_prep(void)
+{
+	int ret;
+
+	if (isatty(STDOUT_FILENO)) {
+		fprintf(stderr, "Not sending a binary stream to stdout\n");
+		return -1;
+	}
+
+	ret = write(STDOUT_FILENO, &route_dump_magic, sizeof(route_dump_magic));
+	if (ret != sizeof(route_dump_magic)) {
+		fprintf(stderr, "Can't write magic to dump file\n");
+		return -1;
+	}
+
+	return 0;
+}
+
 static int iproute_list_flush_or_save(int argc, char **argv, int action)
 {
 	int do_ipv6 = preferred_family;
@@ -1101,9 +1121,12 @@ static int iproute_list_flush_or_save(int argc, char **argv, int action)
 	unsigned int mark = 0;
 	rtnl_filter_t filter_fn;
 
-	if (action == IPROUTE_SAVE)
+	if (action == IPROUTE_SAVE) {
+		if (save_route_prep())
+			return -1;
+
 		filter_fn = save_route;
-	else
+	} else
 		filter_fn = print_route;
 
 	iproute_reset_filter();
@@ -1240,8 +1263,6 @@ static int iproute_list_flush_or_save(int argc, char **argv, int action)
 	if (do_ipv6 == AF_UNSPEC && filter.tb)
 		do_ipv6 = AF_INET;
 
-	ll_init_map(&rth);
-
 	if (id || od)  {
 		int idx;
 
@@ -1341,7 +1362,7 @@ static int iproute_list_flush_or_save(int argc, char **argv, int action)
 }
 
 
-int iproute_get(int argc, char **argv)
+static int iproute_get(int argc, char **argv)
 {
 	struct {
 		struct nlmsghdr 	n;
@@ -1423,11 +1444,9 @@ int iproute_get(int argc, char **argv)
 	}
 
 	if (req.r.rtm_dst_len == 0) {
-		fprintf(stderr, "need at least destination address\n");
+		fprintf(stderr, "need at least a destination address\n");
 		exit(1);
 	}
-
-	ll_init_map(&rth);
 
 	if (idev || odev)  {
 		int idx;
@@ -1506,7 +1525,8 @@ int iproute_get(int argc, char **argv)
 	exit(0);
 }
 
-int restore_handler(const struct sockaddr_nl *nl, struct nlmsghdr *n, void *arg)
+static int restore_handler(const struct sockaddr_nl *nl, struct nlmsghdr *n,
+			   void *arg)
 {
 	int ret;
 
@@ -1521,12 +1541,48 @@ int restore_handler(const struct sockaddr_nl *nl, struct nlmsghdr *n, void *arg)
 	return ret;
 }
 
-int iproute_restore(void)
+static int route_dump_check_magic(void)
 {
+	int ret;
+	__u32 magic = 0;
+
+	if (isatty(STDIN_FILENO)) {
+		fprintf(stderr, "Can't restore route dump from a terminal\n");
+		return -1;
+	}
+
+	ret = fread(&magic, sizeof(magic), 1, stdin);
+	if (magic != route_dump_magic) {
+		fprintf(stderr, "Magic mismatch (%d elems, %x magic)\n", ret, magic);
+		return -1;
+	}
+
+	return 0;
+}
+
+static int iproute_restore(void)
+{
+	if (route_dump_check_magic())
+		exit(-1);
+
 	exit(rtnl_from_file(stdin, &restore_handler, NULL));
 }
 
-void iproute_reset_filter()
+static int show_handler(const struct sockaddr_nl *nl, struct nlmsghdr *n, void *arg)
+{
+	print_route(nl, n, stdout);
+	return 0;
+}
+
+static int iproute_showdump(void)
+{
+	if (route_dump_check_magic())
+		exit(-1);
+
+	exit(rtnl_from_file(stdin, &show_handler, NULL));
+}
+
+void iproute_reset_filter(void)
 {
 	memset(&filter, 0, sizeof(filter));
 	filter.mdst.bitlen = -1;
@@ -1570,6 +1626,8 @@ int do_iproute(int argc, char **argv)
 		return iproute_list_flush_or_save(argc-1, argv+1, IPROUTE_SAVE);
 	if (matches(*argv, "restore") == 0)
 		return iproute_restore();
+	if (matches(*argv, "showdump") == 0)
+		return iproute_showdump();
 	if (matches(*argv, "help") == 0)
 		usage();
 	fprintf(stderr, "Command \"%s\" is unknown, try \"ip route help\".\n", *argv);
