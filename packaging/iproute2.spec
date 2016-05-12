@@ -13,6 +13,7 @@ BuildRequires: bison
 BuildRequires: flex
 BuildRequires: db4-devel
 BuildRequires: pkgconfig(xtables)
+BuildRequires: libnl2-devel
 Conflicts: kernel < 2.4.20
 
 %description
