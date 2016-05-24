@@ -39,6 +39,7 @@ A library for accessing the netlink service.
 %patch2 -p1
 
 %build
+%restore_fcommon
 ./configure
 make %{?jobs:-j%jobs}
 
